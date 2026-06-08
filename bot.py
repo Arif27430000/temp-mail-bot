@@ -5,15 +5,20 @@ import requests
 import telebot
 from threading import Thread
 import time
+from flask import Flask
+
+# Initialize a dummy Flask instance to keep Render's health checks happy
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is running smoothly!", 200
 
 # Direct Bot Token Configuration
 TOKEN = "8953590306:AAFfDTe3BxPnp0PhogapywtSzSeWPPmobjo"
 bot = telebot.TeleBot(TOKEN)
 
 API_URL = "https://api.mail.tm"
-
-# In-Memory Session Database
-# Maps chat_id -> {'address': '...', 'token': '...', 'last_checked': ...}
 user_accounts = {}
 
 def generate_random_string(length=10):
@@ -29,14 +34,11 @@ def get_bot_keyboard():
     markup.add(btn_ref, btn_del)
     return markup
 
-# Helper function to create an account through the free API network
 def create_mail_tm_account(chat_id):
     try:
-        # 1. Fetch available public domains
         dom_res = requests.get(f"{API_URL}/domains").json()
         domain = dom_res['hydra:member'][0]['domain']
         
-        # 2. Register a randomized username address profile
         prefix = generate_random_string(10)
         email_str = f"{prefix}@{domain}"
         password_str = generate_random_string(12)
@@ -45,7 +47,6 @@ def create_mail_tm_account(chat_id):
         acc_res = requests.post(f"{API_URL}/accounts", json=acc_payload)
         
         if acc_res.status_code == 201:
-            # 3. Request a session JWT token
             tok_res = requests.post(f"{API_URL}/token", json=acc_payload).json()
             user_accounts[chat_id] = {
                 "address": email_str,
@@ -56,7 +57,6 @@ def create_mail_tm_account(chat_id):
         print(f"Account Generation Error: {e}")
     return None
 
-# Background mail checking loop to push messages to Telegram instantly
 def automatic_mail_checker():
     while True:
         for chat_id, account in list(user_accounts.items()):
@@ -66,16 +66,13 @@ def automatic_mail_checker():
                 emails = msg_res.get('hydra:member', [])
                 
                 for mail in emails:
-                    # Fetch single full message details
                     mail_id = mail['id']
                     detail_res = requests.get(f"{API_URL}/messages/{mail_id}", headers=headers).json()
                     
-                    # Extract plaintext text content body
                     body_content = detail_res.get('text', 'Empty Body Message')
                     sender = detail_res['from']['address']
                     subject = detail_res.get('subject', 'No Subject')
                     
-                    # Send alert to Telegram user channel
                     alert = (
                         f"📧 **New Mail Received!**\n\n"
                         f"👤 **From:** {sender}\n"
@@ -83,17 +80,15 @@ def automatic_mail_checker():
                         f"📝 **Message:**\n{body_content}"
                     )
                     bot.send_message(chat_id, alert, parse_mode="Markdown")
-                    
-                    # Delete message from the remote temporary storage server so it doesn't trigger again
                     requests.delete(f"{API_URL}/messages/{mail_id}", headers=headers)
             except Exception as e:
                 pass
-        time.sleep(5)  # Poll the open endpoints every 5 seconds for new emails
+        time.sleep(5)
 
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     chat_id = message.chat.id
-    bot.send_message(message.chat.id, "🔄 Generating your free temporary mailbox address. Please wait...")
+    bot.send_message(chat_id, "🔄 Generating your free temporary mailbox address. Please wait...")
     
     email_address = create_mail_tm_account(chat_id)
     if email_address:
@@ -113,14 +108,7 @@ def change_cmd(message):
 
 @bot.message_handler(func=lambda msg: msg.text == "🔄 refresh")
 def refresh_cmd(message):
-    chat_id = message.chat.id
-    account = user_accounts.get(chat_id)
-    if not account:
-        bot.send_message(chat_id, "No active mailbox. Tap 🎲 random to start.")
-        return
-        
-    bot.send_message(chat_id, "Checking for incoming messages... 🔍")
-    # The automatic background thread handles delivery, but this provides instant visual response
+    bot.send_message(message.chat.id, "Checking for incoming messages... 🔍")
 
 @bot.message_handler(func=lambda msg: msg.text == "🗑️ delete")
 def delete_cmd(message):
@@ -129,10 +117,17 @@ def delete_cmd(message):
         del user_accounts[chat_id]
     bot.send_message(message.chat.id, "🗑️ Current address deleted. Your inbox is closed.", reply_markup=get_bot_keyboard())
 
+def run_bot_polling():
+    bot.infinity_polling()
+
 if __name__ == '__main__':
-    # Initialize background worker loop thread
+    # Thread 1: Mail Checker Worker
     check_thread = Thread(target=automatic_mail_checker, daemon=True)
     check_thread.start()
     
-    # Run Telegram Polling Engine natively
-    bot.infinity_polling()
+    # Thread 2: Telegram Bot Polling Worker
+    bot_thread = Thread(target=run_bot_polling, daemon=True)
+    bot_thread.start()
+    
+    # Main Thread: Run Flask to keep Render interface status running live!
+    app.run(host='0.0.0.0', port=5000)
