@@ -5,13 +5,13 @@ import requests
 import telebot
 from threading import Thread
 import time
-from flask import Flask, request, jsonify
+from flask import Flask, request
 
 app = Flask(__name__)
 
-# Direct Bot Token Configuration
+# Direct Bot Token Configuration - Force Threaded Mode OFF for stable Webhooks
 TOKEN = "8953590306:AAFfDTe3BxPnp0PhogapywtSzSeWPPmobjo"
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(TOKEN, threaded=False)
 
 API_URL = "https://api.mail.tm"
 user_accounts = {}
@@ -80,7 +80,7 @@ def automatic_mail_checker():
                 pass
         time.sleep(5)
 
-# --- WEBHOOK ENDPOINT FOR TELEGRAM TRAFFIC ---
+# --- WEBHOOK PASS ROUTER LINK ---
 @app.route('/telegram', methods=['POST'])
 def telegram_webhook():
     if request.headers.get('content-type') == 'application/json':
@@ -94,7 +94,7 @@ def telegram_webhook():
 def home():
     return "Mail.tm Engine Live", 200
 
-# --- BOT TELEGRAM EVENT HANDLING HANDLERS ---
+# --- TELEGRAM BOT ACTIONS ---
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     chat_id = message.chat.id
@@ -127,7 +127,7 @@ def delete_cmd(message):
         del user_accounts[chat_id]
     bot.send_message(message.chat.id, "🗑️ Current address deleted. Your inbox is closed.", reply_markup=get_bot_keyboard())
 
-# Start mail background checker worker thread safely
+# Initialize background background mail scanning checks
 check_thread = Thread(target=automatic_mail_checker, daemon=True)
 check_thread.start()
 
