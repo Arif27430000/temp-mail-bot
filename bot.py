@@ -154,21 +154,19 @@ def handle_tg_buttons(call):
         for mail in messages[-2:]:  
             bot.send_message(chat_id, f"📧 **New Email Received!**\n\n👤 **From:** {mail['sender']}\n📌 **Subject:** {mail['subject']}\n\n📝 **Message:**\n{mail['body']}")
 
+# CloudMailin Inbound Data Parser Structure
 @app.route('/email', methods=['POST'])
 def receive_email():
-    payload = request.get_json(silent=True)
-    if not payload:
+    data = request.get_json(silent=True)
+    if not data:
         return "No Data Received", 400
-    email_data_block = payload.get('data', {})
-    sender_info = email_data_block.get('from', {})
-    sender = sender_info.get('email', 'Unknown Sender')
-    subject = email_data_block.get('subject', 'No Subject')
-    body = email_data_block.get('text', 'Empty Body')
-    recipients = email_data_block.get('to', [])
-    if not recipients:
-        return "OK", 200
-    recipient_email = str(recipients[0].get('email', '')).lower()
-    prefix = recipient_email.split('@')[0]
+    envelope = data.get('envelope', {})
+    headers = data.get('headers', {})
+    sender = envelope.get('from', 'Unknown Sender')
+    subject = headers.get('Subject', 'No Subject')
+    body = data.get('plain', 'Empty Body')
+    recipient = str(envelope.get('to', '')).lower()
+    prefix = recipient.split('@')[0]
     email_item = {"sender": sender, "subject": subject, "body": body}
     if prefix not in email_inboxes:
         email_inboxes[prefix] = []
