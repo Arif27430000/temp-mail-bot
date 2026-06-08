@@ -6,81 +6,99 @@ from flask import Flask, request, render_template_string, redirect, url_for
 
 app = Flask(__name__)
 
-# Direct Token Configuration
+# Direct Bot Token
 TOKEN = "8953590306:AAFfDTe3BxPnp0PhogapywtSzSeWPPmobjo"
 bot = telebot.TeleBot(TOKEN)
 
-# In-Memory Databases
+# Databases
 user_emails = {}   
 email_inboxes = {} 
 
 def generate_random_prefix(length=6):
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
+# --- PREMIUM TEMP-MAIL.ORG WEB INTERFACE CLONE ---
 WEB_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Temp Mail - Disposable Temporary Email</title>
+    <title>⚡ Temp Mail - Disposable Temporary Email</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #171d2b; color: #f8fafc; margin:0; padding:0; }
-        .header { background-color: #1e2640; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); text-align: center; }
-        .logo { color: #00e676; font-size: 22px; font-weight: bold; letter-spacing: 1px; }
-        .container { max-width: 550px; margin: 30px auto; padding: 0 20px; text-align: center; }
-        h1 { font-size: 24px; margin-bottom: 20px; color: #ffffff; font-weight: 600; }
-        .email-box { background: #242f4d; padding: 15px; border-radius: 8px; border: 2px dashed #3a4b7c; font-size: 18px; margin-bottom: 20px; word-break: break-all; color: #00e676; font-weight: bold; }
-        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 30px; }
-        .btn { background: #2d3a60; color: white; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; font-size: 14px; display: flex; align-items: center; justify-content: center; }
-        .btn:hover { background: #3a4b7c; }
-        .btn-green { background: #00e676; color: #171d2b; }
-        .btn-green:hover { background: #00c853; }
-        .inbox-card { background: #1e2640; border-radius: 8px; padding: 20px; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-        .inbox-header { font-size: 16px; font-weight: bold; border-bottom: 1px solid #3a4b7c; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; color: #94a3b8; }
-        .email-item { background: #242f4d; padding: 15px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #00e676; }
-        .email-meta { font-size: 12px; color: #94a3b8; margin-bottom: 5px; }
-        .email-subject { font-weight: bold; font-size: 15px; margin-bottom: 5px; color: #ffffff; }
-        .email-body { font-size: 14px; color: #cbd5e1; white-space: pre-wrap; }
-        .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
-        .empty-icon { font-size: 48px; margin-bottom: 15px; display:block; color: #3a4b7c; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: #1e2026; color: #ffffff; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
+        .navbar { width: 100%; max-width: 600px; padding: 20px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
+        .logo { font-size: 24px; font-weight: 800; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+        .logo span { color: #00cd84; }
+        .premium-badge { background-color: #f7e115; color: #000000; padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; text-decoration: none; }
+        
+        .main-card { background-color: #262932; width: 92%; max-width: 550px; border-radius: 12px; padding: 30px 20px; margin-top: 20px; box-sizing: border-box; border: 1px dashed #3d4352; text-align: center; position: relative; }
+        .card-title { font-size: 20px; color: #a2a8b5; font-weight: 500; margin-bottom: 20px; }
+        .email-display { width: 100%; background-color: #1a1c22; border: none; padding: 18px 12px; border-radius: 8px; color: #ffffff; font-size: 18px; font-weight: 600; text-align: center; box-sizing: border-box; margin-bottom: 20px; outline: none; }
+        
+        .action-row { display: flex; gap: 12px; justify-content: center; margin-bottom: 10px; }
+        .btn-action { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; min-width: 130px; }
+        .btn-qr { background-color: #3b3f4d; color: #ffffff; }
+        .btn-copy { background-color: #00cd84; color: #ffffff; width: 100%; }
+        
+        .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 92%; max-width: 550px; margin-top: 20px; }
+        .btn-ctrl { background-color: #ffffff; color: #262932; padding: 14px; border-radius: 8px; font-weight: 600; text-decoration: none; border: none; font-size: 15px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; gap: 8px; }
+        
+        .inbox-container { width: 92%; max-width: 550px; background-color: #262932; border-radius: 12px; margin-top: 25px; box-sizing: border-box; overflow: hidden; margin-bottom: 50px; }
+        .inbox-header { background-color: #1a1c22; padding: 15px 20px; font-weight: bold; font-size: 16px; color: #a2a8b5; text-align: left; }
+        .inbox-body { padding: 40px 20px; text-align: center; background-color: #262932; }
+        .empty-icon { width: 64px; height: 64px; opacity: 0.3; margin-bottom: 15px; }
+        .empty-text { font-size: 18px; color: #ffffff; font-weight: 500; margin-bottom: 5px; }
+        .empty-subtext { font-size: 14px; color: #697080; }
+        
+        .mail-item { padding: 15px 20px; border-bottom: 1px solid #3d4352; text-align: left; }
+        .mail-sender { font-weight: bold; color: #00cd84; font-size: 14px; margin-bottom: 30px; }
+        .mail-subject { font-weight: 600; font-size: 16px; margin-bottom: 5px; }
+        .mail-body { color: #a2a8b5; font-size: 14px; white-space: pre-wrap; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="logo">🔒 TEMP MAIL</div>
+
+    <div class="navbar">
+        <div class="logo">✉️ TEMP<span>MAIL</span></div>
+        <a href="#" class="premium-badge">Premium</a>
     </div>
-    <div class="container">
-        <h1>Your Temporary Email Address</h1>
-        <div class="email-box">{{ prefix }}@fixscal.com</div>
-        <div class="actions">
-            <button class="btn btn-green" onclick="navigator.clipboard.writeText('{{ prefix }}@fixscal.com'); alert('Copied!');">Copy</button>
-            <a href="/" class="btn">Refresh</a>
-            <a href="/change" class="btn">Change</a>
-            <a href="/delete" class="btn" style="color: #ff5252;">Delete</a>
+
+    <div class="main-card">
+        <div class="card-title">Your Temporary Email Address</div>
+        <input class="email-display" type="text" value="{{ prefix }}@fixscal.com" readonly id="mailBox">
+        <div class="action-row">
+            <button class="btn-action btn-qr">🔳 QR code</button>
+            <button class="btn-action btn-copy" onclick="navigator.clipboard.writeText('{{ prefix }}@fixscal.com'); alert('Copied!');">📋 Copy</button>
         </div>
-        <div class="inbox-card">
-            <div class="inbox-header">
-                <span>INBOX</span>
-                <span style="font-size: 12px; color: #00e676;">Waiting for incoming messages...</span>
-            </div>
+    </div>
+
+    <div class="control-grid">
+        <button class="btn-ctrl" onclick="navigator.clipboard.writeText('{{ prefix }}@fixscal.com');">📄 Copy</button>
+        <a href="/" class="btn-ctrl">🔄 Refresh</a>
+        <a href="/change" class="btn-ctrl">✏️ Change</a>
+        <a href="/delete" class="btn-ctrl" style="color: #ff4a4a;">❌ Delete</a>
+    </div>
+
+    <div class="inbox-container">
+        <div class="inbox-header">INBOX</div>
+        <div class="inbox-body">
             {% if emails %}
                 {% for mail in emails %}
-                    <div class="email-item">
-                        <div class="email-meta">From: {{ mail.sender }}</div>
-                        <div class="email-subject">Subject: {{ mail.subject }}</div>
-                        <div class="email-body">{{ mail.body }}</div>
+                    <div class="mail-item">
+                        <div class="mail-sender">From: {{ mail.sender }}</div>
+                        <div class="mail-subject">Subject: {{ mail.subject }}</div>
+                        <div class="mail-body">{{ mail.body }}</div>
                     </div>
                 {% endfor %}
             {% else %}
-                <div class="empty-state">
-                    <span class="empty-icon">✉️</span>
-                    Your inbox is empty<br>
-                    <span style="font-size: 12px; color: #64748b;">Waiting for incoming emails</span>
-                </div>
+                <img class="empty-icon" src="https://cdn-icons-png.flaticon.com/512/6584/6584934.png" alt="Mail">
+                <div class="empty-text">Your inbox is empty</div>
+                <div class="empty-subtext">Waiting for incoming emails</div>
             {% endif %}
         </div>
     </div>
+
 </body>
 </html>
 """
@@ -106,6 +124,7 @@ def web_reset():
     response.set_cookie('web_prefix', new_prefix, max_age=86400 * 30)
     return response
 
+# --- TELEGRAM BOT PIPELINE ROUTER ---
 @app.route('/telegram', methods=['POST'])
 def telegram_webhook():
     if request.headers.get('content-type') == 'application/json':
@@ -115,46 +134,45 @@ def telegram_webhook():
         return "OK", 200
     return "Forbidden", 403
 
-def make_telegram_keyboard():
-    markup = telebot.types.InlineKeyboardMarkup(row_width=2)
-    btn_gen = telebot.types.InlineKeyboardButton("➕ Generate New / Delete", callback_data="tg_generate")
-    btn_ref = telebot.types.InlineKeyboardButton("🔄 Refresh", callback_data="tg_refresh")
+# Permanent bottom-panel grid matching the design mockup layout
+def get_telegram_persistent_keyboard():
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    btn_gen = telebot.types.KeyboardButton("➕ Generate New / Delete")
+    btn_ref = telebot.types.KeyboardButton("🔄 Refresh")
     markup.add(btn_gen, btn_ref)
     return markup
 
 @bot.message_handler(commands=['start'])
-def tg_start(message):
+@bot.message_handler(func=lambda msg: msg.text == "➕ Generate New / Delete")
+def tg_handler(message):
     chat_id = message.chat.id
-    if chat_id not in user_emails:
-        prefix = f"bot_{generate_random_prefix()}"
-        user_emails[chat_id] = prefix
-        email_inboxes[prefix] = []
+    prefix = f"bot_{generate_random_prefix()}"
+    user_emails[chat_id] = prefix
+    email_inboxes[prefix] = []
+    
+    response_msg = (
+        f"Your temporary email address:\n\n"
+        f"*{prefix}@fixscal.com*\n\n"
+        f"[Open in Browser ➡️](https://temp-mail-bot-cbs4.onrender.com)"
+    )
+    bot.send_message(chat_id, response_msg, parse_mode="Markdown", reply_markup=get_telegram_persistent_keyboard(), disable_web_page_preview=False)
+
+@bot.message_handler(func=lambda msg: msg.text == "🔄 Refresh")
+def tg_refresh_handler(message):
+    chat_id = message.chat.id
+    prefix = user_emails.get(chat_id)
+    if not prefix:
+        bot.send_message(chat_id, "Please use ➕ Generate New first.", reply_markup=get_telegram_persistent_keyboard())
+        return
+        
+    messages = email_inboxes.get(prefix, [])
+    if not messages:
+        bot.send_message(chat_id, "📬 *Your inbox is empty*\nWaiting for incoming emails...", parse_mode="Markdown")
     else:
-        prefix = user_emails[chat_id]
-    msg_text = f"Your temporary email address:\n\n`{prefix}@fixscal.com`\n\n[Open in Browser ➡️](https://temp-mail-bot-cbs4.onrender.com)"
-    bot.send_message(chat_id, msg_text, parse_mode="Markdown", reply_markup=make_telegram_keyboard())
+        for mail in messages[-2:]:
+            bot.send_message(chat_id, f"📧 **New Email!**\n\n**From:** {mail['sender']}\n**Subject:** {mail['subject']}\n\n{mail['body']}")
 
-@bot.callback_query_handler(func=lambda call: call.data in ["tg_generate", "tg_refresh"])
-def handle_tg_buttons(call):
-    chat_id = call.message.chat.id
-    if call.data == "tg_generate":
-        prefix = f"bot_{generate_random_prefix()}"
-        user_emails[chat_id] = prefix
-        email_inboxes[prefix] = []
-        bot.answer_callback_query(call.id, "New Address Generated!")
-        msg_text = f"Your temporary email address:\n\n`{prefix}@fixscal.com`\n\n[Open in Browser ➡️](https://temp-mail-bot-cbs4.onrender.com)"
-        bot.edit_message_text(msg_text, chat_id, call.message.message_id, parse_mode="Markdown", reply_markup=make_telegram_keyboard())
-    elif call.data == "tg_refresh":
-        prefix = user_emails.get(chat_id)
-        if not prefix:
-            bot.answer_callback_query(call.id, "Error: Start the bot first.")
-            return
-        messages = email_inboxes.get(prefix, [])
-        bot.answer_callback_query(call.id, f"Refreshed! ({len(messages)} emails)")
-        for mail in messages[-2:]:  
-            bot.send_message(chat_id, f"📧 **New Email Received!**\n\n👤 **From:** {mail['sender']}\n📌 **Subject:** {mail['subject']}\n\n📝 **Message:**\n{mail['body']}")
-
-# CloudMailin Inbound Data Parser Structure
+# Inbound webhook system connector
 @app.route('/email', methods=['POST'])
 def receive_email():
     data = request.get_json(silent=True)
@@ -167,13 +185,15 @@ def receive_email():
     body = data.get('plain', 'Empty Body')
     recipient = str(envelope.get('to', '')).lower()
     prefix = recipient.split('@')[0]
+    
     email_item = {"sender": sender, "subject": subject, "body": body}
     if prefix not in email_inboxes:
         email_inboxes[prefix] = []
     email_inboxes[prefix].append(email_item)
+    
     for chat_id, tg_prefix in list(user_emails.items()):
         if tg_prefix == prefix:
-            msg = f"📧 **New Inbound Mail Received!**\n\n👤 **From:** {sender}\n📌 **Subject:** {subject}\n\n📝 **Message:**\n{body}"
+            msg = f"📧 **New Email Received!**\n\n👤 **From:** {sender}\n📌 **Subject:** {subject}\n\n📝 **Message:**\n{body}"
             bot.send_message(chat_id, msg)
             break
     return "OK", 200
