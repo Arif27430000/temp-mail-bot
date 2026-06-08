@@ -18,7 +18,7 @@ def generate_random_prefix(length=6):
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=length))
 
 # ---------------------------------------------------
-# 1. PREMIUM WEB INTERFACE LAYOUT
+# 1. PREMIUM WEB INTERFACE LAYOUT (Matching temp-mail.org)
 # ---------------------------------------------------
 WEB_TEMPLATE = """
 <!DOCTYPE html>
@@ -115,7 +115,7 @@ def web_reset():
     return response
 
 # ---------------------------------------------------
-# 2. TELEGRAM PIPELINE
+# 2. TELEGRAM INTERFACE PIPELINE (Matching Telegram Layout)
 # ---------------------------------------------------
 @app.route('/telegram', methods=['POST'])
 def telegram_webhook():
@@ -173,32 +173,24 @@ def handle_tg_buttons(call):
             bot.send_message(chat_id, f"📧 **New Email Received!**\n\n👤 **From:** {mail['sender']}\n📌 **Subject:** {mail['subject']}\n\n📝 **Message:**\n{mail['body']}")
 
 # ---------------------------------------------------
-# 3. MAILERSEND INBOUND WEBHOOK ENDPOINT (Updated)
+# 3. CLOUDMAILIN INBOUND WEBHOOK ENDPOINT
 # ---------------------------------------------------
 @app.route('/email', methods=['POST'])
 def receive_email():
-    payload = request.get_json(silent=True)
-    if not payload:
+    data = request.get_json(silent=True)
+    if not data:
         return "No Data Received", 400
         
-    # MailerSend routes data under an array block inside 'data'
-    email_data_block = payload.get('data', {})
+    envelope = data.get('envelope', {})
+    headers = data.get('headers', {})
     
-    # Extract Sender
-    sender_info = email_data_block.get('from', {})
-    sender = sender_info.get('email', 'Unknown Sender')
+    sender = envelope.get('from', 'Unknown Sender')
+    subject = headers.get('Subject', 'No Subject')
+
+    body = data.get('plain', 'Empty Body')
+
     
-    # Extract Subject & Text Body
-    subject = email_data_block.get('subject', 'No Subject')
-    body = email_data_block.get('text', 'Empty Body')
-    
-    # Extract Recipient Array
-    recipients = email_data_block.get('to', [])
-    if not recipients:
-        return "OK", 200
-        
-    recipient_email = str(recipients[0].get('email', '')).lower()
-    prefix = recipient_email.split('@')[0]
+    prefix = recipient.split('@')[0]
     
     email_item = {
         "sender": sender,
@@ -208,17 +200,4 @@ def receive_email():
     
     if prefix not in email_inboxes:
         email_inboxes[prefix] = []
-    email_inboxes[prefix].append(email_item)
-    
-    # Route straight to Telegram
-    for chat_id, tg_prefix in list(user_emails.items()):
-        if tg_prefix == prefix:
-            msg = f"📧 **New Inbound Mail Received!**\n\n👤 **From:** {sender}\n📌 **Subject:** {subject}\n\n📝 **Message:**\n{body}"
-            bot.send_message(chat_id, msg)
-            break
-            
-    return "OK", 200
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-
+  
