@@ -5,14 +5,9 @@ import requests
 import telebot
 from threading import Thread
 import time
-from flask import Flask
+from flask import Flask, request, jsonify
 
-# Initialize a dummy Flask instance to keep Render's health checks happy
 app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot is running smoothly!", 200
 
 # Direct Bot Token Configuration
 TOKEN = "8953590306:AAFfDTe3BxPnp0PhogapywtSzSeWPPmobjo"
@@ -85,6 +80,21 @@ def automatic_mail_checker():
                 pass
         time.sleep(5)
 
+# --- WEBHOOK ENDPOINT FOR TELEGRAM TRAFFIC ---
+@app.route('/telegram', methods=['POST'])
+def telegram_webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return "OK", 200
+    return "Forbidden", 403
+
+@app.route('/')
+def home():
+    return "Mail.tm Engine Live", 200
+
+# --- BOT TELEGRAM EVENT HANDLING HANDLERS ---
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     chat_id = message.chat.id
@@ -117,17 +127,9 @@ def delete_cmd(message):
         del user_accounts[chat_id]
     bot.send_message(message.chat.id, "🗑️ Current address deleted. Your inbox is closed.", reply_markup=get_bot_keyboard())
 
-def run_bot_polling():
-    bot.infinity_polling()
+# Start mail background checker worker thread safely
+check_thread = Thread(target=automatic_mail_checker, daemon=True)
+check_thread.start()
 
 if __name__ == '__main__':
-    # Thread 1: Mail Checker Worker
-    check_thread = Thread(target=automatic_mail_checker, daemon=True)
-    check_thread.start()
-    
-    # Thread 2: Telegram Bot Polling Worker
-    bot_thread = Thread(target=run_bot_polling, daemon=True)
-    bot_thread.start()
-    
-    # Main Thread: Run Flask to keep Render interface status running live!
     app.run(host='0.0.0.0', port=5000)
